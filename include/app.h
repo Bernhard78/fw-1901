@@ -9,20 +9,31 @@
 #define CAN_BITRATE_KBIT        250
 #define SENSOR_PERIOD_MS        10000
 #define HEARTBEAT_PERIOD_MS     1000
-#define RELAY_FAILSAFE_MS       10000   /* nur aktiv, wenn DIP-Bit 7 EIN */
+#define LONG_PRESS_MS           3000    /* T2 lang: Hysterese-Menue */
+#define EDIT_TIMEOUT_MS         10000   /* Edit ohne Taste -> verwerfen */
+
+/* Zweipunktregler (Heizen), alle Werte in 0,01 degC */
+#define SETPOINT_MIN_C100       1500
+#define SETPOINT_MAX_C100       2500
+#define SETPOINT_STEP_C100      50
+#define SETPOINT_DEFAULT_C100   2000
+#define HYST_MIN_C100           20
+#define HYST_MAX_C100           500
+#define HYST_STEP_C100          10
+#define HYST_DEFAULT_C100       100
 
 /* ---- relay.c ---- */
-typedef enum { RELAY_SRC_LOCAL, RELAY_SRC_CAN } relay_src_t;
 void relay_init(void);
-void relay_set(bool on, relay_src_t src);
+void relay_set(bool on);
 bool relay_get(void);
-void relay_task(uint32_t now_ms, bool failsafe_enabled);
 
 /* ---- inputs.c ---- */
 void     inputs_init(void);
 uint8_t  inputs_read_dip(void);     /* Bit n = DI_ADRn, 1 = Schalter EIN */
 void     inputs_task_10ms(void);
-uint8_t  inputs_take_presses(void); /* Bit0..2 = Taster 1..3 seit letztem Aufruf gedrueckt */
+uint8_t  inputs_take_presses(void); /* Bit0..2 = Taster 1..3 seit letztem Aufruf gedrueckt
+                                       (T2: kurz, beim Loslassen) */
+uint8_t  inputs_take_long_presses(void); /* Bit1 = T2 laenger als LONG_PRESS_MS gehalten */
 
 /* ---- sensors.c ---- */
 typedef struct {
@@ -38,6 +49,19 @@ typedef struct {
 void sensors_init(void);
 void sensors_task(void);            /* im SENSOR_PERIOD_MS-Takt aufrufen */
 const sensor_data_t *sensors_get(void);
+
+/* ---- thermostat.c ---- */
+typedef enum { TEMP_SRC_NONE, TEMP_SRC_SI, TEMP_SRC_BME } temp_src_t;
+void        thermostat_init(void);                     /* Werte aus Flash laden */
+void        thermostat_update(const sensor_data_t *d); /* nach jeder Messung */
+bool        thermostat_set_setpoint(int16_t c100);     /* false = ausserhalb Bereich */
+bool        thermostat_set_hyst(int16_t c100);
+int16_t     thermostat_setpoint(void);
+int16_t     thermostat_hyst(void);
+temp_src_t  thermostat_source(void);
+int16_t     thermostat_actual(void);                   /* nur gueltig, wenn Quelle != NONE */
+int16_t     thermostat_clamp_setpoint(int32_t c100);   /* Bereich + Raster (fuer Edit) */
+int16_t     thermostat_clamp_hyst(int32_t c100);
 
 /* ---- sh1106.c ---- */
 bool sh1106_init(void);

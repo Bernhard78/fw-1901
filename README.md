@@ -1,6 +1,7 @@
 # Firmware Baugruppe 1901 (DPL-02, STM32F103C8T6)
 
-Relais per CAN schalten, Sensorwerte (BME280, Si7006) per CAN senden, OLED-Anzeige mit 3 Tastern.
+Relais über Zweipunktregler (Heizen) mit Hysterese, Sensorwerte (BME280, Si7006) per CAN senden,
+OLED-Anzeige mit 3 Tastern.
 
 ## Bauen / Flashen
 ```
@@ -13,21 +14,35 @@ pio run -t upload       # per ST-Link (SWD-Stecker CN1)
 | Schalter | Bedeutung |
 |---|---|
 | DI_ADR0..6 | Knoten-ID 1..127 (binär, EIN = 1). ID 0 = CAN bleibt aus, Anzeige „Adresse?“ |
-| DI_ADR7 | Fail-safe: per CAN eingeschaltetes Relais fällt nach 10 s ohne Befehl ab |
+| DI_ADR7 | frei (früher Fail-safe für CAN-Relaisbefehle) |
+
+## Zweipunktregler (Heizen)
+- Istwert: Si7006, bei Fehler BME280. Beide ausgefallen → Relais AUS.
+- Relais EIN bei T < Soll − H/2, AUS bei T > Soll + H/2, dazwischen bleibt der Zustand.
+- Ausgewertet wird bei jeder Messung (alle 10 s).
+- Sollwert 15,0–25,0 °C (0,5-°C-Schritte, Standard 20,0), Hysterese 0,2–5,0 °C
+  (0,1-°C-Schritte, Standard 1,0). Beide liegen im Flash (Seite 0x0800FC00) und
+  überstehen einen Neustart.
 
 ## Bedienung
-- T1 (DI1): nächste Anzeigeseite (Messwerte / CAN / Relais)
-- T2 (DI2): Relais lokal umschalten
+- T1 (DI1): nächste Anzeigeseite (Messwerte / CAN / Regler)
+- T2 (DI2) kurz: Sollwert einstellen
+- T2 (DI2) 3 s halten: Hysterese einstellen
 - T3 (DI3): Anzeige an/aus
+
+Im Einstellmodus: T1 = −, T3 = +, T2 = übernehmen und speichern.
+10 s ohne Taste → Änderung wird verworfen.
 
 ## CAN-Protokoll (250 kbit/s, 11-bit-IDs, Little Endian)
 | ID | Richtung | Inhalt |
 |---|---|---|
-| `0x200 + ID` | → Knoten | Byte0: `0` Relais aus, `1` ein, `2` umschalten, `0x10` Daten sofort senden |
+| `0x200 + ID` | → Knoten | Byte0: `0x10` Daten sofort senden; `0x20` Sollwert setzen, `0x21` Hysterese setzen (Byte1–2 int16 [0,01 °C], außerhalb des Bereichs ignoriert, wird auf Raster gerundet) |
 | `0x200` | → alle | Broadcast, gleiche Befehle |
 | `0x180 + ID` | Knoten → | BME280, 8 Byte: T int16 [0,01 °C], rF uint16 [0,01 %], p uint32 [Pa] |
 | `0x280 + ID` | Knoten → | Si7006, 4 Byte: T int16 [0,01 °C], rF uint16 [0,01 %] |
-| `0x700 + ID` | Knoten → | Heartbeat 1 s, 3 Byte: Relais (0/1), Fehlerbits (0x01 BME, 0x02 Si, 0x04 Bus-Off), Zähler |
+| `0x700 + ID` | Knoten → | Heartbeat 1 s, 7 Byte: Relais (0/1), Fehlerbits (0x01 BME, 0x02 Si, 0x04 Bus-Off, 0x08 kein Istwert), Zähler, Sollwert int16 [0,01 °C], Hysterese int16 [0,01 °C] |
+
+Beispiel: Sollwert 20,5 °C an Knoten 5 → ID `0x205`, Daten `20 02 08` (2050 = 0x0802).
 
 Bitrate: `CAN_BITRATE_KBIT` in `include/app.h` (125/250/500; 1 Mbit/s erst mit R9 = 0 Ω).
 CANH = LineB, CANL = LineA (Klemme U1 Pin 2/3 auf der Kontaktebene).

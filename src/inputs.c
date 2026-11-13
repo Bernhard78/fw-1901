@@ -5,6 +5,11 @@
 static uint8_t s_stable;     /* Bit = 1: Taster gedrueckt (entprellt) */
 static uint8_t s_last_raw;
 static uint8_t s_presses;
+static uint8_t s_long_presses;
+static uint16_t s_t2_held;   /* T2 gedrueckt seit n x 10 ms */
+static bool s_t2_long_done;  /* Langdruck schon gemeldet -> kein Kurzdruck beim Loslassen */
+
+#define T2_MASK 2U
 
 void inputs_init(void)
 {
@@ -57,21 +62,46 @@ static uint8_t read_buttons_raw(void)
     return r;
 }
 
-/* alle 10 ms: Zustand gilt, wenn zwei Abtastungen (20 ms) uebereinstimmen */
+/* alle 10 ms: Zustand gilt, wenn zwei Abtastungen (20 ms) uebereinstimmen.
+   T1/T3 melden beim Druecken. T2 meldet kurz beim Loslassen oder einmal
+   lang nach LONG_PRESS_MS gehalten. */
 void inputs_task_10ms(void)
 {
     uint8_t raw = read_buttons_raw();
     if (raw == s_last_raw) {
         uint8_t newly = (uint8_t)(raw & ~s_stable);
-        s_presses |= newly;
+        uint8_t released = (uint8_t)(s_stable & ~raw);
+        s_presses |= (uint8_t)(newly & ~T2_MASK);
+
+        if (released & T2_MASK) {
+            if (!s_t2_long_done) {
+                s_presses |= T2_MASK;
+            }
+            s_t2_held = 0;
+            s_t2_long_done = false;
+        }
         s_stable = raw;
     }
     s_last_raw = raw;
+
+    if ((s_stable & T2_MASK) && !s_t2_long_done) {
+        if (++s_t2_held >= LONG_PRESS_MS / 10) {
+            s_long_presses |= T2_MASK;
+            s_t2_long_done = true;
+        }
+    }
 }
 
 uint8_t inputs_take_presses(void)
 {
     uint8_t p = s_presses;
     s_presses = 0;
+    return p;
+}
+
+uint8_t inputs_take_long_presses(void)
+{
+    uint8_t p = s_long_presses;
+    s_long_presses = 0;
     return p;
 }

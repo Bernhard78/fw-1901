@@ -9,10 +9,9 @@ CAN_HandleTypeDef hcan;
 #define ID_SI_BASE      0x280U
 #define ID_HB_BASE      0x700U
 
-#define CMD_RELAY_OFF    0x00
-#define CMD_RELAY_ON     0x01
-#define CMD_RELAY_TOGGLE 0x02
 #define CMD_REQUEST      0x10    /* Sensordaten + Heartbeat sofort senden */
+#define CMD_SET_SETPOINT 0x20    /* Byte1-2: Sollwert int16 [0,01 degC] */
+#define CMD_SET_HYST     0x21    /* Byte1-2: Hysterese int16 [0,01 degC] */
 
 static uint8_t s_node;
 static can_stats_t s_stats;
@@ -122,12 +121,15 @@ void can_proto_send_sensors(const sensor_data_t *d)
 void can_proto_send_heartbeat(void)
 {
     const sensor_data_t *d = sensors_get();
-    uint8_t b[3];
+    uint8_t b[7];
     b[0] = relay_get() ? 1 : 0;
     b[1] = (uint8_t)((d->bme_ok ? 0 : 0x01) | (d->si_ok ? 0 : 0x02) |
-                     (s_stats.bus_off ? 0x04 : 0));
+                     (s_stats.bus_off ? 0x04 : 0) |
+                     (thermostat_source() == TEMP_SRC_NONE ? 0x08 : 0));
     b[2] = s_hb_counter++;
-    send(ID_HB_BASE + s_node, b, 3);
+    put16(&b[3], (uint16_t)thermostat_setpoint());
+    put16(&b[5], (uint16_t)thermostat_hyst());
+    send(ID_HB_BASE + s_node, b, 7);
 }
 
 void can_proto_poll(uint32_t now_ms)
@@ -147,9 +149,16 @@ void can_proto_poll(uint32_t now_ms)
             continue;
         }
         switch (d[0]) {
-        case CMD_RELAY_OFF:    relay_set(false, RELAY_SRC_CAN); break;
-        case CMD_RELAY_ON:     relay_set(true, RELAY_SRC_CAN); break;
-        case CMD_RELAY_TOGGLE: relay_set(!relay_get(), RELAY_SRC_CAN); break;
+        case CMD_SET_SETPOINT:
+            if (h.DLC >= 3) {
+                thermostat_set_setpoint((int16_t)(d[1] | d[2] << 8));   /* ausserhalb Bereich: ignoriert */
+            }
+            break;
+        case CMD_SET_HYST:
+            if (h.DLC >= 3) {
+                thermostat_set_hyst((int16_t)(d[1] | d[2] << 8));
+            }
+            break;
         case CMD_REQUEST:
             can_proto_send_sensors(sensors_get());
             can_proto_send_heartbeat();
