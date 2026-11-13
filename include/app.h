@@ -7,7 +7,7 @@
 
 /* ---- Konfiguration ---- */
 #define CAN_BITRATE_KBIT        250
-#define SENSOR_PERIOD_MS        1000
+#define SENSOR_PERIOD_MS        10000
 #define HEARTBEAT_PERIOD_MS     1000
 #define RELAY_FAILSAFE_MS       10000   /* nur aktiv, wenn DIP-Bit 7 EIN */
 
