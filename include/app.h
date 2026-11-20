@@ -37,6 +37,7 @@ uint8_t  inputs_take_long_presses(void); /* Bit1 = T2 laenger als LONG_PRESS_MS 
 
 /* ---- sensors.c ---- */
 typedef struct {
+    bool     bme_present;   /* beim Start gefunden; sonst "nicht bestueckt", kein Fehler */
     bool     bme_ok;
     int16_t  bme_t_c100;    /* 0,01 degC */
     uint16_t bme_rh_p100;   /* 0,01 %rF */

@@ -123,7 +123,7 @@ void can_proto_send_heartbeat(void)
     const sensor_data_t *d = sensors_get();
     uint8_t b[7];
     b[0] = relay_get() ? 1 : 0;
-    b[1] = (uint8_t)((d->bme_ok ? 0 : 0x01) | (d->si_ok ? 0 : 0x02) |
+    b[1] = (uint8_t)((d->bme_present && !d->bme_ok ? 0x01 : 0) | (d->si_ok ? 0 : 0x02) |
                      (s_stats.bus_off ? 0x04 : 0) |
                      (thermostat_source() == TEMP_SRC_NONE ? 0x08 : 0));
     b[2] = s_hb_counter++;

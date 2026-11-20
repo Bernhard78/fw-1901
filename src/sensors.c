@@ -127,18 +127,21 @@ static bool si_read(void)
 void sensors_init(void)
 {
     s_bme_init = bme_init();
+    s_data.bme_present = s_bme_init;    /* beim Start nicht gefunden = nicht bestueckt */
     s_data.bme_ok = false;
     s_si_pending = si_start();
 }
 
 void sensors_task(void)
 {
-    if (!s_bme_init) {
-        s_bme_init = bme_init();
-    }
-    s_data.bme_ok = s_bme_init && bme_read();
-    if (!s_data.bme_ok) {
-        s_bme_init = false;             /* naechstes Mal neu initialisieren */
+    if (s_data.bme_present) {
+        if (!s_bme_init) {
+            s_bme_init = bme_init();
+        }
+        s_data.bme_ok = s_bme_init && bme_read();
+        if (!s_data.bme_ok) {
+            s_bme_init = false;         /* naechstes Mal neu initialisieren */
+        }
     }
 
     /* Si7006: Ergebnis der im letzten Zyklus gestarteten Messung abholen,

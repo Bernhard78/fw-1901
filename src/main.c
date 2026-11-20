@@ -111,7 +111,7 @@ static void draw(uint8_t page, uint8_t node, bool can_ok)
                      (unsigned long)(d->bme_p_pa / 100), (unsigned long)(d->bme_p_pa % 100 / 10));
             sh1106_text(0, 4, l);
         } else {
-            sh1106_text(0, 2, "BME280 Fehler");
+            sh1106_text(0, 2, d->bme_present ? "BME280 Fehler" : "BME280 -");
         }
         if (d->si_ok) {
             fmt_c100(l, sizeof l, "Si  T  ", d->si_t_c100, " C");    sh1106_text(0, 6, l);

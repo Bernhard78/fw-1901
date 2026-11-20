@@ -18,6 +18,8 @@ pio run -t upload       # per ST-Link (SWD-Stecker CN1)
 
 ## Zweipunktregler (Heizen)
 - Istwert: Si7006, bei Fehler BME280. Beide ausgefallen → Relais AUS.
+- Der BME280 ist optional: Wird er beim Start nicht gefunden, gilt er als nicht bestückt
+  (Anzeige „BME280 -“, kein Fehlerbit, kein Telegramm `0x180 + ID`).
 - Relais EIN bei T < Soll − H/2, AUS bei T > Soll + H/2, dazwischen bleibt der Zustand.
 - Ausgewertet wird bei jeder Messung (alle 10 s).
 - Sollwert 15,0–25,0 °C (0,5-°C-Schritte, Standard 20,0), Hysterese 0,2–5,0 °C
@@ -40,7 +42,7 @@ Im Einstellmodus: T1 = −, T3 = +, T2 = übernehmen und speichern.
 | `0x200` | → alle | Broadcast, gleiche Befehle |
 | `0x180 + ID` | Knoten → | BME280, 8 Byte: T int16 [0,01 °C], rF uint16 [0,01 %], p uint32 [Pa] |
 | `0x280 + ID` | Knoten → | Si7006, 4 Byte: T int16 [0,01 °C], rF uint16 [0,01 %] |
-| `0x700 + ID` | Knoten → | Heartbeat 1 s, 7 Byte: Relais (0/1), Fehlerbits (0x01 BME, 0x02 Si, 0x04 Bus-Off, 0x08 kein Istwert), Zähler, Sollwert int16 [0,01 °C], Hysterese int16 [0,01 °C] |
+| `0x700 + ID` | Knoten → | Heartbeat 1 s, 7 Byte: Relais (0/1), Fehlerbits (0x01 BME – nur wenn bestückt, 0x02 Si, 0x04 Bus-Off, 0x08 kein Istwert), Zähler, Sollwert int16 [0,01 °C], Hysterese int16 [0,01 °C] |
 
 Beispiel: Sollwert 20,5 °C an Knoten 5 → ID `0x205`, Daten `20 02 08` (2050 = 0x0802).
 
